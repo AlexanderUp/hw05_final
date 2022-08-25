@@ -8,7 +8,7 @@ from django.views.decorators.cache import cache_page
 
 from .forms import CommentForm, PostForm
 from .models import Follow, Group, Post
-from .utils import _get_page_object_from_paginator
+from .utils import get_page_object_from_paginator
 
 User = get_user_model()
 
@@ -18,7 +18,7 @@ def index(request):
     posts = (Post.objects
                  .select_related("author")
                  .all())
-    page_obj = _get_page_object_from_paginator(
+    page_obj = get_page_object_from_paginator(
         posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
     )
     context = {
@@ -30,7 +30,7 @@ def index(request):
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
     posts = group.posts.select_related("author").all()
-    page_obj = _get_page_object_from_paginator(
+    page_obj = get_page_object_from_paginator(
         posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
     )
     context = {
@@ -43,18 +43,12 @@ def group_posts(request, slug):
 def profile(request, username):
     requested_user = get_object_or_404(User, username=username)
     posts = requested_user.posts.all()
-    page_obj = _get_page_object_from_paginator(
+    page_obj = get_page_object_from_paginator(
         posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
     )
-    following = False
-    if request.user.is_authenticated:
-        following = (
-            request.user
-                   .follower
-                   .select_related("user", "author")
-                   .filter(author=requested_user)
-                   .exists()
-        )
+    following = request.user.is_authenticated and Follow.objects.filter(
+        user=request.user, author=requested_user
+    ).exists()
     context = {
         "requested_user": requested_user,
         "page_obj": page_obj,
@@ -85,9 +79,7 @@ def post_create(request):
         new_post = form.save(commit=False)
         new_post.author = request.user
         new_post.save()
-        return HttpResponseRedirect(
-            reverse("posts:profile", args=(request.user.username,))
-        )
+        return redirect("posts:profile", username=request.user.username)
     context = {
         "form": form,
     }
@@ -132,15 +124,8 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    following_users = (
-        request.user
-               .follower
-               .select_related("author")
-               .values("author")
-               .all()
-    )
-    posts = Post.objects.filter(author__in=following_users)
-    page_obj = _get_page_object_from_paginator(
+    posts = Post.objects.filter(author__following__user=request.user)
+    page_obj = get_page_object_from_paginator(
         posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
     )
     context = {
@@ -152,11 +137,8 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
-    is_follow_exists = Follow.objects.filter(
-        user=request.user, author=author
-    ).exists()
-    if request.user != author and not is_follow_exists:
-        Follow.objects.create(
+    if request.user != author:
+        Follow.objects.get_or_create(
             user=request.user,
             author=author,
         )

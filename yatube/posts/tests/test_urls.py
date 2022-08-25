@@ -12,7 +12,7 @@ User = get_user_model()
 class StaticURLTests(TestCase):
     def test_homepage(self):
         guest_client = Client()
-        response = guest_client.get('/')
+        response = guest_client.get("/")
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
@@ -136,7 +136,7 @@ class PostsURLTests(TestCase):
         """
         Проверяем запрос к несуществующей странице.
         """
-        url = '/page_url_that_does_not_exists/'
+        url = "/page_url_that_does_not_exists/"
         authorized_client_response = self.authorized_client.get(url)
         self.assertEqual(
             authorized_client_response.status_code, HTTPStatus.NOT_FOUND

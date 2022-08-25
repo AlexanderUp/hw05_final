@@ -3,7 +3,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 
 
-def _get_page_object_from_paginator(
+def get_page_object_from_paginator(
         posts: QuerySet,
         posts_per_page: int,
         request: HttpRequest) -> Page:

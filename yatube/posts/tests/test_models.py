@@ -34,7 +34,7 @@ class ModelsTest(TestCase):
         test_object_names = {
             ModelsTest.group: ModelsTest.group.title,
             ModelsTest.post: ModelsTest.post.text[:15],
-            ModelsTest.comment: ModelsTest.comment.text,
+            ModelsTest.comment: ModelsTest.comment.text[:15],
         }
         for instance, expected_value in test_object_names.items():
             with self.subTest(instance=instance):
