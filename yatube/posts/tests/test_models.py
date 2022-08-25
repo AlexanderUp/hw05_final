@@ -149,3 +149,13 @@ class ModelsTest(TestCase):
             Follow.objects.create(
                 user=ModelsTest.user, author=ModelsTest.author
             )
+
+    def test_self_follow_is_not_possible_constraint(self):
+        """
+        Проверяем, что пользователь не может подписаться сам на себя.
+        """
+        self.assertEqual(Follow.objects.count(), 1)
+        with self.assertRaises(IntegrityError):
+            Follow.objects.create(
+                user=ModelsTest.user, author=ModelsTest.user
+            )
