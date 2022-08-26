@@ -5,6 +5,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_cookie
 
 from .forms import CommentForm, PostForm
 from .models import Follow, Group, Post
@@ -14,6 +15,7 @@ User = get_user_model()
 
 
 @cache_page(20)
+@vary_on_cookie
 def index(request):
     posts = (Post.objects
                  .select_related("author")
