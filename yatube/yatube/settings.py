@@ -26,6 +26,8 @@ SECRET_KEY = 'tu-e6ixu*1scnfpb8pn&@wbfs1i!a+2(mc5+6y)^)w666*jnt0'
 DEBUG = True
 
 ALLOWED_HOSTS = [
+    'www.alexanderup.pythonanywhere.com',
+    'alexanderup.pythonanywhere.com',
     'localhost',
     '127.0.0.1',
     '[::1]',

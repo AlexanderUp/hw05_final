@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
 
@@ -117,7 +118,7 @@ class Follow(models.Model):
         on_delete=models.CASCADE,
         related_name="following",
         verbose_name="User-author",
-        help_text="Author followed by",
+        help_text="Author, that is followed by",
     )
 
     class Meta:
@@ -134,3 +135,7 @@ class Follow(models.Model):
 
     def __str__(self):
         return f"<{self.user}:{self.author}>"
+
+    def clean(self):
+        if self.user == self.author:
+            raise ValidationError("User can not follow himself")

@@ -126,7 +126,7 @@ class ModelsTest(TestCase):
                 ModelsTest.follow,
                 {
                     "user": "User, that follows",
-                    "author": "Author followed by",
+                    "author": "Author, that is followed by",
                 }
             ),
         )
