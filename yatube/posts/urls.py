@@ -16,9 +16,6 @@ urlpatterns = [
         views.ProfileListView.as_view(),
         name="profile"
     ),
-    # path(
-    #     "posts/<int:pk>/comment/", views.add_comment, name="add_comment"
-    # ),
     path(
         "posts/<int:pk>/comment/",
         views.AddCommentView.as_view(),

@@ -2,8 +2,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -12,8 +11,8 @@ from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView, FormView, UpdateView
 from django.views.generic.list import ListView
 
-from .forms import CommentForm, PostForm
-from .models import Comment, Follow, Group, Post
+from .forms import CommentForm
+from .models import Follow, Group, Post
 
 User = get_user_model()
 
@@ -68,7 +67,9 @@ class PostDetailView(DetailView):
     template_name = "posts/post_detail.html"
 
     def get_object(self):
-        return Post.objects.select_related("group").get(pk=self.kwargs.get("pk"))
+        return (Post.objects
+                    .select_related("group")
+                    .get(pk=self.kwargs.get("pk")))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
