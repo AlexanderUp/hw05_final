@@ -10,11 +10,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.paginator import Page
 from django.db import models
 from django.db.models.fields.files import ImageFieldFile
+from django.forms import ModelForm
 from django.shortcuts import get_object_or_404
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from ..forms import CommentForm, PostForm
+from ..forms import CommentForm
 from ..models import Follow, Group, Post
 
 User = get_user_model()
@@ -53,7 +54,7 @@ class TemplatesUsedViewTest(TestCase):
                 "username": TemplatesUsedViewTest.user.username
             }): "posts/profile.html",
             reverse("posts:post_detail", kwargs={
-                "post_id": TemplatesUsedViewTest.post.pk
+                "pk": TemplatesUsedViewTest.post.pk
             }): "posts/post_detail.html",
         }
         cls.templates_authorized_access = {
@@ -62,12 +63,12 @@ class TemplatesUsedViewTest(TestCase):
         }
         cls.templates_authorized_post_author_access = {
             reverse("posts:post_edit", kwargs={
-                "post_id": TemplatesUsedViewTest.post.pk
+                "pk": TemplatesUsedViewTest.post.pk
             }): "posts/create_post.html",
         }
         cls.templates_authorized_not_author_access = {
             reverse("posts:post_edit", kwargs={
-                "post_id": TemplatesUsedViewTest.post.pk
+                "pk": TemplatesUsedViewTest.post.pk
             }): "posts/post_detail.html",
         }
 
@@ -289,7 +290,7 @@ class ContextViewTest(TestCase):
         """
         url = reverse(
             "posts:post_detail", kwargs={
-                "post_id": ContextViewTest.post.pk
+                "pk": ContextViewTest.post.pk
             }
         )
         response = self.authorized_client.get(url)
@@ -327,7 +328,7 @@ class ContextViewTest(TestCase):
         response = self.authorized_client.get(
             reverse(
                 "posts:post_detail", kwargs={
-                    "post_id": ContextViewTest.post.pk
+                    "pk": ContextViewTest.post.pk
                 }
             )
         )
@@ -345,18 +346,18 @@ class ContextViewTest(TestCase):
         url = reverse("posts:post_create")
         response = self.authorized_client.get(url)
         form_obj = response.context.get("form")
-        self.assertIsInstance(form_obj, PostForm)
+        self.assertIsInstance(form_obj, ModelForm)
 
     def test_context_post_edit(self):
         """
         Проверяем контекст страницы редактирования поста.
         """
         url = reverse("posts:post_edit", kwargs={
-            "post_id": ContextViewTest.post.pk,
+            "pk": ContextViewTest.post.pk,
         })
         response = self.authorized_client.get(url)
         form_obj = response.context.get("form")
-        self.assertIsInstance(form_obj, PostForm)
+        self.assertIsInstance(form_obj, ModelForm)
         is_edit_obj = response.context.get("is_edit")
         self.assertIsInstance(is_edit_obj, bool)
 

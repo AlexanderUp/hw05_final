@@ -5,6 +5,7 @@
 <main>
   <div class="container py-5">
     <h1>Последние обновления на сайте</h1>
+    <p>Всего постов: <b>{{ page_obj.paginator.count }}</b></p>
     {% include "posts/includes/switcher.html" %}
     {% for post in page_obj %}
       {% include "posts/includes/post_in_post_list.html" %}

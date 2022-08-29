@@ -151,3 +151,4 @@ yatube/posts/static/
 yatube/media/
 yatube/sent_mails/
 
+*_backup.py

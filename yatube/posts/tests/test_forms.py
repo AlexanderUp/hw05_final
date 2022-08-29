@@ -125,14 +125,14 @@ class TestPostsForm(TestCase):
         }
         response = self.authorized_client.post(
             reverse("posts:post_edit", kwargs={
-                "post_id": TestPostsForm.test_edit_post.pk
+                "pk": TestPostsForm.test_edit_post.pk
             }),
             data=edit_form_data,
             follow=True,
         )
         self.assertRedirects(
             response, reverse("posts:post_detail", kwargs={
-                "post_id": TestPostsForm.test_edit_post.pk
+                "pk": TestPostsForm.test_edit_post.pk
             })
         )
         self.assertTrue(

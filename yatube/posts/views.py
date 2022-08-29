@@ -1,139 +1,144 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
+from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
+from django.views.generic.detail import DetailView
+from django.views.generic.edit import CreateView, FormView, UpdateView
+from django.views.generic.list import ListView
 
 from .forms import CommentForm, PostForm
-from .models import Follow, Group, Post
-from .utils import get_page_object_from_paginator
+from .models import Comment, Follow, Group, Post
 
 User = get_user_model()
 
 
-@cache_page(20)
-@vary_on_cookie
-def index(request):
-    posts = (Post.objects
-                 .select_related("author")
-                 .all())
-    page_obj = get_page_object_from_paginator(
-        posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
-    )
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, "posts/index.html", context)
+@method_decorator(cache_page(20), name='dispatch')
+@method_decorator(vary_on_cookie, name='dispatch')
+class IndexListView(ListView):
+    template_name = "posts/index.html"
+    paginate_by = settings.NUMBER_OF_POSTS_PER_PAGE
+
+    def get_queryset(self):
+        return Post.objects.select_related("author", "group").all()
 
 
-def group_posts(request, slug):
-    group = get_object_or_404(Group, slug=slug)
-    posts = group.posts.select_related("author").all()
-    page_obj = get_page_object_from_paginator(
-        posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
-    )
-    context = {
-        "group": group,
-        "page_obj": page_obj,
-    }
-    return render(request, "posts/group_list.html", context)
+class GroupPostsListView(ListView):
+    template_name = "posts/group_list.html"
+    paginate_by = settings.NUMBER_OF_POSTS_PER_PAGE
+
+    def get_queryset(self):
+        self.group = get_object_or_404(Group, slug=self.kwargs["slug"])
+        return self.group.posts.select_related("author").all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["group"] = self.group
+        return context
 
 
-def profile(request, username):
-    requested_user = get_object_or_404(User, username=username)
-    posts = requested_user.posts.all()
-    page_obj = get_page_object_from_paginator(
-        posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
-    )
-    following = request.user.is_authenticated and Follow.objects.filter(
-        user=request.user, author=requested_user
-    ).exists()
-    context = {
-        "requested_user": requested_user,
-        "page_obj": page_obj,
-        "following": following,
-    }
-    return render(request, "posts/profile.html", context)
+class ProfileListView(ListView):
+    template_name = "posts/profile.html"
+    paginate_by = settings.NUMBER_OF_POSTS_PER_PAGE
 
-
-def post_detail(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    comment_form = CommentForm()
-    comments = post.comments.select_related("author").all()
-    context = {
-        "post": post,
-        "comment_form": comment_form,
-        "comments": comments,
-    }
-    return render(request, "posts/post_detail.html", context)
-
-
-@login_required
-def post_create(request):
-    form = PostForm(
-        request.POST or None,
-        files=request.FILES or None,
-    )
-    if form.is_valid():
-        new_post = form.save(commit=False)
-        new_post.author = request.user
-        new_post.save()
-        return redirect("posts:profile", username=request.user.username)
-    context = {
-        "form": form,
-    }
-    return render(request, "posts/create_post.html", context)
-
-
-@login_required
-def post_edit(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    if request.user.pk != post.author.pk:
-        return HttpResponseRedirect(
-            reverse("posts:post_detail", args=(post_id,))
+    def get_queryset(self):
+        self.requested_user = get_object_or_404(
+            User, username=self.kwargs["username"]
         )
-    form = PostForm(
-        request.POST or None,
-        files=request.FILES or None,
-        instance=post
-    )
-    if form.is_valid():
-        form.save()
-        return HttpResponseRedirect(
-            reverse("posts:post_detail", args=(post_id,))
+        return self.requested_user.posts.select_related("group").all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["requested_user"] = self.requested_user
+        context["following"] = (
+            self.request.user.is_authenticated and Follow.objects.filter(
+                user=self.request.user, author=self.requested_user
+            ).exists()
         )
-    context = {
-        "form": form,
-        "is_edit": True,
-    }
-    return render(request, "posts/create_post.html", context)
+        return context
 
 
-@login_required
-def add_comment(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    form = CommentForm(request.POST or None)
-    if form.is_valid():
-        comment = form.save(commit=False)
-        comment.author = request.user
-        comment.post = post
-        comment.save()
-    return redirect("posts:post_detail", post_id=post_id)
+class PostDetailView(DetailView):
+    model = Post
+    template_name = "posts/post_detail.html"
+
+    def get_object(self):
+        return Post.objects.select_related("group").get(pk=self.kwargs.get("pk"))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["comment_form"] = CommentForm()
+        context["comments"] = (
+            self.object.comments.select_related("author").all()
+        )
+        return context
 
 
-@login_required
-def follow_index(request):
-    posts = Post.objects.filter(author__following__user=request.user)
-    page_obj = get_page_object_from_paginator(
-        posts, settings.NUMBER_OF_POSTS_PER_PAGE, request
-    )
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, "posts/follow.html", context)
+class PostCreateView(LoginRequiredMixin, CreateView):
+    model = Post
+    fields = ["text", "group", "image", ]
+    template_name = "posts/create_post.html"
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy(
+            "posts:profile", args=(self.request.user.username,)
+        )
+
+
+class PostEditView(LoginRequiredMixin, UpdateView):
+    model = Post
+    fields = ["text", "group", "image", ]
+    template_name = "posts/create_post.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.user.is_authenticated:
+            if request.user != self.object.author:
+                return redirect(
+                    reverse("posts:post_detail", args=(self.kwargs.get("pk"),))
+                )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["is_edit"] = True
+        return context
+
+
+class AddCommentView(LoginRequiredMixin, FormView):
+    form_class = CommentForm
+
+    def post(self, request, *args, **kwargs):
+        post = get_object_or_404(Post, pk=kwargs.get("pk"))
+        form = self.form_class(request.POST)
+        if form.is_valid:
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.post = post
+            comment.save()
+        return redirect("posts:post_detail", pk=kwargs.get("pk"))
+
+
+@method_decorator(login_required, name='dispatch')
+class FollowIndexListView(ListView):
+    template_name = "posts/follow.html"
+    paginate_by = settings.NUMBER_OF_POSTS_PER_PAGE
+
+    def get_queryset(self):
+        return (
+            Post.objects
+                .filter(author__following__user=self.request.user)
+                .select_related("author", "group")
+        )
 
 
 @login_required
