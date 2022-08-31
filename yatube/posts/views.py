@@ -1,7 +1,11 @@
+import os
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.files.storage import default_storage
+from django.http import HttpResponseServerError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
@@ -108,6 +112,18 @@ class PostUpdateView(
         context = super().get_context_data(**kwargs)
         context["is_edit"] = True
         return context
+
+    def form_valid(self, form):
+        if form["image"].initial != form["image"].value():
+            if form["image"].initial:
+                try:
+                    default_storage.delete(form["image"].initial.path)
+                except OSError:
+                    return HttpResponseServerError()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy("posts:post_detail", args=(self.object.pk,))
 
 
 class PostDeleteView(

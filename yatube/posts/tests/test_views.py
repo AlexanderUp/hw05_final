@@ -702,6 +702,32 @@ class ImageCreationTest(TestCase):
             post_obj.image.name, ImageCreationTest.post.image.name
         )
 
+    def test_associated_image_is_deleted(self):
+        """
+        Проверяем, что при удалении поста, картинка физически удаляется
+        из папки.
+        """
+        post_created = Post.objects.create(
+            text=POST_INITIAL_FIELD_VALUES["text"],
+            author=ImageCreationTest.user,
+            group=ImageCreationTest.group,
+            image=SimpleUploadedFile(
+                "file2.gif",
+                ImageCreationTest.binary_content,
+                content_type="image/gif",
+            )
+        )
+        initial_post_count = Post.objects.count()
+        path = post_created.image.path
+        self.assertTrue(os.path.exists(path))
+        with open(post_created.image.path, "br") as f:
+            content = f.read()
+            self.assertEqual(content, ImageCreationTest.binary_content)
+        url = reverse("posts:post_delete", args=(post_created.pk,))
+        self.auth_client.post(url)
+        self.assertEqual(Post.objects.count(), (initial_post_count - 1))
+        self.assertFalse(os.path.exists(path))
+
 
 class CommentCreationTest(TestCase):
     @classmethod

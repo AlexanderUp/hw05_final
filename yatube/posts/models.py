@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.db import models
 from django.db.models import F, Q
 from django.urls import reverse
@@ -67,6 +68,12 @@ class Post(models.Model):
 
     def __str__(self):
         return self.text[:15]
+
+    def delete(self):
+        if self.image:
+            path = self.image.path
+            default_storage.delete(path)
+        super().delete()
 
     def get_absolute_url(self):
         return reverse("posts:post_detail", kwargs={"pk": self.pk})
