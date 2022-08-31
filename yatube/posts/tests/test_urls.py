@@ -128,9 +128,9 @@ class PostsURLTests(TestCase):
         for url, template_name in urls.items():
             with self.subTest(url=url, template_name=template_name):
                 response = authorized_not_author_client.get(url, follow=True)
-                self.assertEqual(response.status_code, HTTPStatus.OK)
+                self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
                 self.assertTemplateNotUsed(response, template_name)
-                self.assertTemplateUsed(response, "posts/post_detail.html")
+                self.assertTemplateUsed(response, "core/403.html")
 
     def test_url_does_not_exist(self):
         """

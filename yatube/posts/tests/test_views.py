@@ -16,7 +16,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from ..forms import CommentForm
-from ..models import Follow, Group, Post
+from ..models import Comment, Follow, Group, Post
 
 User = get_user_model()
 
@@ -184,11 +184,8 @@ class TemplatesUsedViewTest(TestCase):
                 self.assertEqual(not_author.pk, response.wsgi_request.user.pk)
                 self.assertFalse(response.wsgi_request.user.is_anonymous)
                 self.assertTrue(response.wsgi_request.user.is_authenticated)
-                self.assertEqual(response.status_code, HTTPStatus.FOUND)
-                redirect_url = f"/posts/{TemplatesUsedViewTest.post.pk}/"
-                self.assertRedirects(response, redirect_url)
-                redirected_response = not_author_client.get(redirect_url)
-                self.assertTemplateUsed(redirected_response, template)
+                self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+                self.assertTemplateUsed(response, "core/403.html")
 
 
 class ContextViewTest(TestCase):
@@ -506,11 +503,22 @@ class PostCreationTest(TestCase):
             author=cls.user,
             group=cls.group_primary,
         )
+        cls.comment = Comment.objects.create(
+            post=cls.post,
+            author=cls.user,
+            text="Comment text",
+        )
+        cls.not_author_user = User.objects.create(username="not_author")
 
     def setUp(self):
         cache.clear()
+        self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(PostCreationTest.user)
+        self.not_author_auth_client = Client()
+        self.not_author_auth_client.force_login(
+            PostCreationTest.not_author_user
+        )
 
     def test_post_is_on_main_page(self):
         """
@@ -556,6 +564,57 @@ class PostCreationTest(TestCase):
         post_object_list = response.context.get("page_obj").object_list
         self.assertNotIn(PostCreationTest.post, post_object_list)
 
+    def test_post_deletion_authorized_author_client_success(self):
+        """
+        Проверяем, что пост удален из БД авторизованным пользователем,
+        являющимся автором поста.
+        """
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Comment.objects.count(), 1)
+
+        url = reverse("posts:post_delete", args=(PostCreationTest.post.pk,))
+        self.authorized_client.post(url)
+        self.assertEqual(Post.objects.count(), 0)
+        self.assertEqual(Comment.objects.count(), 0)
+
+    def test_post_deletion_authorized_not_author_client_fail(self):
+        """
+        Проверяем, что авторизованный пользователь, не являющийся автором
+        поста, не может удалить пост.
+        """
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Comment.objects.count(), 1)
+
+        url = reverse("posts:post_delete", args=(PostCreationTest.post.pk,))
+        response = self.not_author_auth_client.post(url)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Comment.objects.count(), 1)
+
+    def test_post_deletion_guest_client_fail(self):
+        """
+        Проверяем, что неавторизованный пользователь не может удалить пост.
+        """
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Comment.objects.count(), 1)
+
+        url = reverse("posts:post_delete", args=(PostCreationTest.post.pk,))
+        response = self.guest_client.post(url)
+        expected_redirect_url = f"/auth/login/?next={url}"
+        self.assertRedirects(response, expected_redirect_url)
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Comment.objects.count(), 1)
+
+    def test_post_can_not_be_edited_by_non_author(self):
+        """
+        Проверяем, что авторизованный пользователь, не являющийся автором
+        поста, не может редактировать пост.
+        """
+        url = reverse("posts:post_edit", args=(PostCreationTest.post.pk,))
+        response = self.not_author_auth_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertTemplateUsed(response, "core/403.html")
+
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class ImageCreationTest(TestCase):
@@ -599,8 +658,7 @@ class ImageCreationTest(TestCase):
         """
         Проверяем, что тестовый пост с изображением создан в БД.
         """
-        initial_post_count = Post.objects.count()
-        self.assertEqual(initial_post_count, 1)
+        self.assertEqual(Post.objects.count(), 1)
         post = get_object_or_404(Post, pk=ImageCreationTest.post.pk)
         self.assertIsNotNone(post.image)
         self.assertIsInstance(post.image, ImageFieldFile)
@@ -658,6 +716,12 @@ class CommentCreationTest(TestCase):
             author=cls.user,
             group=cls.group,
         )
+        cls.comment = Comment.objects.create(
+            post=cls.post,
+            author=cls.user,
+            text="Initial comment text",
+        )
+        cls.not_author_user = User.objects.create(username="not_author")
 
     @classmethod
     def tearDownClass(cls):
@@ -666,8 +730,12 @@ class CommentCreationTest(TestCase):
     def setUp(self):
         cache.clear()
         self.guest_client = Client()
-        self.auth_client = Client()
-        self.auth_client.force_login(CommentCreationTest.user)
+        self.authorized_client = Client()
+        self.authorized_client.force_login(CommentCreationTest.user)
+        self.not_author_auth_client = Client()
+        self.not_author_auth_client.force_login(
+            CommentCreationTest.not_author_user
+        )
 
     def test_guest_client_redirect(self):
         """
@@ -675,7 +743,7 @@ class CommentCreationTest(TestCase):
         на страницу авторизации.
         """
         initial_comment_count = CommentCreationTest.post.comments.count()
-        self.assertEqual(initial_comment_count, 0)
+        self.assertEqual(initial_comment_count, 1)
         response = self.guest_client.post(
             reverse("posts:add_comment", args=(CommentCreationTest.post.pk,))
         )
@@ -697,10 +765,10 @@ class CommentCreationTest(TestCase):
         }
         initial_post_comment_count = CommentCreationTest.post.comments.count()
         initial_user_comment_count = CommentCreationTest.user.comments.count()
-        self.assertEqual(initial_post_comment_count, 0)
-        self.assertEqual(initial_user_comment_count, 0)
+        self.assertEqual(initial_post_comment_count, 1)
+        self.assertEqual(initial_user_comment_count, 1)
 
-        response = self.auth_client.post(
+        response = self.authorized_client.post(
             reverse("posts:add_comment", args=(CommentCreationTest.post.pk,)),
             data=comment_form_data,
             follow=True,
@@ -719,7 +787,7 @@ class CommentCreationTest(TestCase):
             CommentCreationTest.user.comments.count(),
             (initial_user_comment_count + 1)
         )
-        new_response = self.auth_client.get(
+        new_response = self.authorized_client.get(
             reverse("posts:post_detail", args=(CommentCreationTest.post.pk,))
         )
         comments = new_response.context.get("comments")
@@ -728,6 +796,49 @@ class CommentCreationTest(TestCase):
             text=comment_form_data.get("text")
         )
         self.assertIn(comment, comments)
+
+    def test_comment_deletion_authorized_author_client_success(self):
+        """
+        Проверяем, что комментарий удален из БД авторизованным пользователем,
+        являющимся автором комментария.
+        """
+        self.assertEqual(Comment.objects.count(), 1)
+        url = reverse(
+            "posts:comment_delete", args=(
+                CommentCreationTest.post.pk, CommentCreationTest.comment.pk,
+            )
+        )
+        self.authorized_client.post(url)
+        self.assertEqual(Comment.objects.count(), 0)
+
+    def test_comment_deletion_authorized_not_author_client_fail(self):
+        """
+        Проверяем, что авторизованный пользователь, не являющийся автором
+        поста, не может удалить комментарий.
+        """
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Comment.objects.count(), 1)
+
+        url = reverse("posts:post_delete", args=(CommentCreationTest.post.pk,))
+        response = self.not_author_auth_client.post(url)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Comment.objects.count(), 1)
+
+    def test_comment_deletion_guest_client_fail(self):
+        """
+        Проверяем, что неавторизованный пользователь не может удалить
+        комментарий.
+        """
+        self.assertEqual(Comment.objects.count(), 1)
+        url = reverse("posts:comment_delete", args=(
+            CommentCreationTest.post.pk, CommentCreationTest.comment.pk,
+        ))
+        response = self.guest_client.post(url)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        expected_redirect_url = f"/auth/login/?next={url}"
+        self.assertRedirects(response, expected_redirect_url)
+        self.assertEqual(Comment.objects.count(), 1)
 
 
 class CachingIndexPageTest(TestCase):

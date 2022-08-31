@@ -3,16 +3,18 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from django.views.generic.detail import DetailView
-from django.views.generic.edit import CreateView, FormView, UpdateView
+from django.views.generic.edit import (CreateView, DeleteView, FormView,
+                                       UpdateView)
 from django.views.generic.list import ListView
 
 from .forms import CommentForm
-from .models import Follow, Group, Post
+from .models import Comment, Follow, Group, Post
+from .utils import AuthorUserPassesTestMixin
 
 User = get_user_model()
 
@@ -95,19 +97,12 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         )
 
 
-class PostEditView(LoginRequiredMixin, UpdateView):
+class PostUpdateView(
+    LoginRequiredMixin, AuthorUserPassesTestMixin, UpdateView
+):
     model = Post
     fields = ["text", "group", "image", ]
     template_name = "posts/create_post.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if request.user.is_authenticated:
-            if request.user != self.object.author:
-                return redirect(
-                    reverse("posts:post_detail", args=(self.kwargs.get("pk"),))
-                )
-        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -115,7 +110,18 @@ class PostEditView(LoginRequiredMixin, UpdateView):
         return context
 
 
-class AddCommentView(LoginRequiredMixin, FormView):
+class PostDeleteView(
+    LoginRequiredMixin, AuthorUserPassesTestMixin, DeleteView
+):
+    model = Post
+
+    def get_success_url(self):
+        return reverse_lazy(
+            "posts:profile", args=(self.request.user.username,)
+        )
+
+
+class CommentCreateView(LoginRequiredMixin, FormView):
     form_class = CommentForm
 
     def post(self, request, *args, **kwargs):
@@ -127,6 +133,26 @@ class AddCommentView(LoginRequiredMixin, FormView):
             comment.post = post
             comment.save()
         return redirect("posts:post_detail", pk=kwargs.get("pk"))
+
+
+class CommentUpdateView(
+    LoginRequiredMixin, AuthorUserPassesTestMixin, UpdateView
+):
+    pass
+
+
+class CommentDeleteView(
+    LoginRequiredMixin, AuthorUserPassesTestMixin, DeleteView
+):
+    model = Comment
+
+    def get_object(self):
+        return get_object_or_404(Comment, pk=self.kwargs.get("comment_pk"))
+
+    def get_success_url(self):
+        return reverse_lazy(
+            "posts:post_detail", args=(self.kwargs.get("pk"), )
+        )
 
 
 @method_decorator(login_required, name='dispatch')

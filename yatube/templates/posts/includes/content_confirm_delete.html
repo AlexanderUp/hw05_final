@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+  {% if user.is_authenticated %}
+    <div class="row justify-content-center">
+      <div class="col-md-8 p-5">
+        <div class="card">
+          <div class="card-header">
+            {{ card_header }}
+          </div>
+          <div class="card-body">
+            <form method="post" action="">
+              {% csrf_token %}
+                <p>Вы действительно хотите удалить {{ form_instance_name }} "{{ object }}"?</p>
+                  {{ form }}
+                <input type="submit" class="btn btn-primary" value="Подтвердить">
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
