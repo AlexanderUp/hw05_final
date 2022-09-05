@@ -1,6 +1,7 @@
 from django.urls import path
+from rest_framework.urlpatterns import format_suffix_patterns
 
-from . import views
+from . import views, views_rest
 
 app_name = "posts"
 
@@ -56,4 +57,19 @@ urlpatterns = [
         views.CommentDeleteView.as_view(),
         name="comment_delete"
     ),
+    path("api/", views_rest.api_root, name="api_root"),
+    path("api/posts/", views_rest.PostList.as_view(), name="post_list"),
+    path(
+        "api/posts/<int:pk>/",
+        views_rest.PostDetail.as_view(),
+        name="post_detail"
+    ),
+    path("api/users/", views_rest.UserList.as_view(), name="user_list"),
+    path(
+        "api/users/<int:pk>/",
+        views_rest.UserDetail.as_view(),
+        name="user_detail"
+    ),
 ]
+
+urlpatterns = format_suffix_patterns(urlpatterns)

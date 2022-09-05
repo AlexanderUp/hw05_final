@@ -11,9 +11,20 @@ class PostAdmin(admin.ModelAdmin):
         "author",
         "group",
     )
-    list_editable = ("group", )
     search_fields = ("text", )
+    # list_editable = ("group", )
     list_filter = ("pub_date", )
+    list_select_related = ("author", "group",)
+    empty_value_display = "-пусто-"
+
+
+class GroupAdmin(admin.ModelAdmin):
+    list_display = (
+        "pk",
+        "title",
+        "slug",
+        "description",
+    )
     empty_value_display = "-пусто-"
 
 
@@ -40,6 +51,6 @@ class FollowAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Post, PostAdmin)
-admin.site.register(Group)
+admin.site.register(Group, GroupAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(Follow, FollowAdmin)

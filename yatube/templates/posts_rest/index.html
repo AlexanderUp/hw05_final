@@ -1,0 +1,68 @@
+{% extends "posts_rest/base.html" %}
+{% load user_filters %}
+{% block content %}
+<br><br>
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 p-5">
+      <div class="card">
+        <div class="card-header">
+          <a href="/logout">Logout</a>
+          <h2>Hi, {{ request.user.username }}</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 p-5">
+      <div class="card">
+        <div class="card-body">
+          <form method="POST" id="post-form" action="" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="fieldWrapper" id="the_post">
+              {% for field in form %}
+              <div class="form-group row my-3 p-3">
+                <label for="{{ field.id_for_label }}">
+                  {{ field.label }}
+                  {% if field.field.required %}
+                    <span class="required text-danger">*</span>
+                  {% endif %}
+                </label>
+                <div>
+                  {{ field|addclass:'form-control' }}
+                  {% if field.help_text %}
+                    <small id="{{ field.id_for_label }}-help" class="form-text text-muted">
+                      {{ field.help_text|safe }}
+                    </small>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+            <div class="d-flex justify-content-end">
+              <input type="submit" value="Post" class="tiny button">
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <div>
+    <ul id="post">
+      {% for post in posts %}
+        <li id="post-{{ post.pk }}">
+          <strong>{{ post.text }}</strong> -
+          <em>{{ post.author }}</em> -
+          <span>{{ post.pub_date }}</span> -
+          <a id="delete-post-{{ post.id }}">Delete me</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
